@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>JobPulse Lahore</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #050816;
+      --bg-elevated: #0f172a;
+      --accent: #22c55e;
+      --accent-soft: rgba(34, 197, 94, 0.15);
+      --border-subtle: rgba(148, 163, 184, 0.5);
+      --text-main: #e5e7eb;
+      --text-muted: #9ca3af;
+      --pill-bg: rgba(15, 23, 42, 0.9);
+      --shadow-soft: 0 18px 45px rgba(15, 23, 42, 0.9);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
+        "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top left, #0f172a, #020617 55%);
+      color: var(--text-main);
+      display: flex;
+      justify-content: center;
+      padding: 32px 16px;
+    }
+
+    .shell {
+      width: 100%;
+      max-width: 1120px;
+      background: linear-gradient(145deg, rgba(15, 23, 42, 0.96), #020617);
+      border-radius: 28px;
+      border: 1px solid rgba(148, 163, 184, 0.25);
+      box-shadow: var(--shadow-soft);
+      overflow: hidden;
+      position: relative;
+    }
+
+    .shell::before {
+      content: "";
+      position: absolute;
+      inset: -1px;
+      border-radius: 28px;
+      padding: 1px;
+      background: linear-gradient(
+        120deg,
+        rgba(56, 189, 248, 0.4),
+        rgba(34, 197, 94, 0.3),
+        transparent 55%
+      );
+      -webkit-mask:
+        linear-gradient(#000 0 0) content-box,
+        linear-gradient(#000 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+      opacity: 0.5;
+      pointer-events: none;
+    }
+
+    header {
+      padding: 24px 28px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      border-bottom: 1px solid rgba(15, 23, 42, 0.9);
+      background: radial-gradient(circle at top left, #020617, #020617 60%);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .logo-dot {
+      width: 32px;
+      height: 32px;
+      border-radius: 999px;
+      background: radial-gradient(circle at 30% 20%, #bbf7d0, #22c55e 45%, #4ade80);
+      box-shadow:
+        0 0 24px rgba(34, 197, 94, 0.75),
+        0 12px 32px rgba(15, 23, 42, 0.9);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .logo-dot::after {
+      content: "";
+      position: absolute;
+      inset: 4px;
+      border-radius: inherit;
+      background: radial-gradient(circle at bottom, transparent, rgba(15, 23, 42, 0.85));
+      mix-blend-mode: multiply;
+    }
+
+    .brand-text {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .brand-title {
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      font-size: 1.05rem;
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+
+    .brand-badge {
+      font-size: 0.7rem;
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid rgba(34, 197, 94, 0.4);
+      color: #bbf7d0;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .brand-subtitle {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+    }
+
+    .meta {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 4px;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .meta-pill {
+      padding: 4px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(148, 163, 184, 0.4);
+      background: rgba(15, 23, 42, 0.9);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    main {
+      padding: 18px 20px 22px;
+      display: grid;
+      grid-template-columns: minmax(0, 1.4fr) minmax(260px, 0.9fr);
+      gap: 18px;
+    }
+
+    @media (max-width: 860px) {
+      main {
+        grid-template-columns: minmax(0, 1fr);
+      }
+      header {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+      .meta {
+        align-items: flex-start;
+      }
+    }
+
+    .jobs-panel,
+    .filters-panel {
+      background: radial-gradient(circle at top left, #020617, #020617 55%);
+      border-radius: 18px;
+      border: 1px solid rgba(30, 64, 175, 0.3);
+      padding: 14px 14px 16px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .jobs-panel::before,
+    .filters-panel::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(circle at 10% 0%, rgba(56, 189, 248, 0.16), transparent 55%),
+        radial-gradient(circle at 90% 0%, rgba(34, 197, 94, 0.18), transparent 52%);
+      opacity: 0.9;
+      pointer-events: none;
+    }
+
+    .panel-inner {
+      position: relative;
+      z-index: 1;
+    }
+
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .panel-title {
+      font-size: 0.9rem;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--text-muted);
+    }
+
+    .badge-soft {
+      padding: 3px 8px;
+      border-radius: 999px;
+      font-size: 0.72rem;
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid rgba(56, 189, 248, 0.4);
+      color: #e0f2fe;
+    }
+
+    .filters-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.2fr);
+      gap: 8px;
+    }
+
+    @media (min-width: 520px) {
+      .filters-grid {
+        grid-template-columns: minmax(0, 1.2fr) repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    .field-label {
+      display: block;
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+    }
+
+    input[type="text"],
+    select {
+      border-radius: 999px;
+      border: 1px solid rgba(148, 163, 184, 0.4);
+      background: rgba(15, 23, 42, 0.92);
+      color: var(--text-main);
+      padding: 7px 11px;
+      font-size: 0.8rem;
+      outline: none;
+      transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease,
+        transform 0.04s ease;
+    }
+
+    input[type="text"]::placeholder {
+      color: rgba(148, 163, 184, 0.7);
+    }
+
+    input[type="text"]:focus,
+    select:focus {
+      border-color: rgba(34, 197, 94, 0.7);
+      box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.4);
+      background: rgba(15, 23, 42, 0.98);
+      transform: translateY(-0.5px);
+    }
+
+    .actions-row {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    button {
+      border-radius: 999px;
+      border: none;
+      cursor: pointer;
+      font-size: 0.78rem;
+      padding: 7px 14px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 500;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      transition: transform 0.08s ease, box-shadow 0.12s ease, background 0.15s ease,
+        color 0.15s ease, border-color 0.15s ease;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #22c55e, #4ade80);
+      color: #022c22;
+      box-shadow:
+        0 10px 24px rgba(34, 197, 94, 0.35),
+        0 0 0 1px rgba(21, 128, 61, 0.6);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow:
+        0 14px 30px rgba(34, 197, 94, 0.42),
+        0 0 0 1px rgba(22, 163, 74, 0.9);
+    }
+
+    .btn-primary:active {
+      transform: translateY(0);
+      box-shadow:
+        0 6px 20px rgba(34, 197, 94, 0.3),
+        0 0 0 1px rgba(22, 163, 74, 0.9);
+    }
+
+    .btn-secondary {
+      background: rgba(15, 23, 42, 0.96);
+      color: var(--text-muted);
+      border: 1px solid rgba(148, 163, 184, 0.6);
+      box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.8);
+    }
+
+    .btn-secondary:hover {
+      border-color: rgba(148, 163, 184, 0.9);
+      color: #e5e7eb;
+      transform: translateY(-1px);
+    }
+
+    .stats-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+
+    .stat-pill {
+      border-radius: 999px;
+      padding: 6px 11px;
+      font-size: 0.75rem;
+      background: rgba(15, 23, 42, 0.95);
+      border: 1px solid rgba(148, 163, 184, 0.5);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .stat-label {
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+      font-size: 0.68rem;
+    }
+
+    .stat-value {
+      font-weight: 600;
+      color: #e5e7eb;
+    }
+
+    .stat-highlight {
+      background: var(--accent-soft);
+      border-color: rgba(34, 197, 94, 0.6);
+      color: #bbf7d0;
+    }
+
+    .jobs-list {
+      margin-top: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      max-height: 440px;
+      overflow: auto;
+      padding-right: 2px;
+    }
+
+    .jobs-list::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .jobs-list::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .jobs-list::-webkit-scrollbar-thumb {
+      background: rgba(30, 64, 175, 0.7);
+      border-radius: 999px;
+    }
+
+    .job-card {
+      border-radius: 16px;
+      border: 1px solid rgba(30, 64, 175, 0.6);
+      background: linear-gradient(
+        135deg,
+        rgba(15, 23, 42, 0.98),
+        rgba(15, 23, 42, 0.92)
+      );
+      padding: 10px 11px;
+      display: grid;
+      grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+      gap: 6px 10px;
+      position: relative;
+    }
+
+    @media (max-width: 640px) {
+      .job-card {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+
+    .job-main {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .job-title-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .job-title {
+      font-size: 0.9rem;
+      font-weight: 600;
+    }
+
+    .job-company {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .job-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      margin-top: 2px;
+      font-size: 0.72rem;
+    }
+
+    .pill {
+      border-radius: 999px;
+      padding: 3px 8px;
+      border: 1px solid rgba(51, 65, 85, 0.9);
+      background: var(--pill-bg);
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      color: var(--text-muted);
+    }
+
+    .pill-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 99px;
+      background: #22c55e;
+      box-shadow: 0 0 0 1px rgba(22, 163, 74, 0.6);
+    }
+
+    .pill-pill-blue {
+      border-color: rgba(59, 130, 246, 0.8);
+      color: #bfdbfe;
+    }
+
+    .pill-pill-amber {
+      border-color: rgba(245, 158, 11, 0.8);
+      color: #fed7aa;
+    }
+
+    .job-meta {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 6px;
+    }
+
+    .posted-pill {
+      font-size: 0.74rem;
+      padding: 3px 8px;
+      border-radius: 999px;
+      border: 1px dashed rgba(148, 163, 184, 0.9);
+      color: var(--text-muted);
+    }
+
+    .apply-link {
+      font-size: 0.78rem;
+      padding: 6px 11px;
+      border-radius: 999px;
+      border: 1px solid rgba(56, 189, 248, 0.7);
+      background: radial-gradient(circle at top left, rgba(56, 189, 248, 0.16), #020617);
+      color: #e0f2fe;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: transform 0.08s ease, box-shadow 0.12s ease, border-color 0.12s ease,
+        background 0.12s ease;
+    }
+
+    .apply-link span {
+      font-size: 0.9rem;
+    }
+
+    .apply-link:hover {
+      transform: translateY(-1px);
+      border-color: rgba(56, 189, 248, 0.95);
+      box-shadow:
+        0 10px 24px rgba(15, 23, 42, 0.9),
+        0 0 0 1px rgba(56, 189, 248, 0.35);
+    }
+
+    .apply-link:active {
+      transform: translateY(0);
+      box-shadow:
+        0 6px 18px rgba(15, 23, 42, 0.9),
+        0 0 0 1px rgba(56, 189, 248, 0.35);
+    }
+
+    .empty-state {
+      border-radius: 16px;
+      border: 1px dashed rgba(55, 65, 81, 0.9);
+      padding: 16px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      background: rgba(15, 23, 42, 0.92);
+      margin-top: 6px;
+    }
+
+    .empty-title {
+      font-size: 0.9rem;
+      font-weight: 500;
+    }
+
+    .empty-text {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .empty-hint {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 4px;
+      font-size: 0.75rem;
+    }
+
+    .chip {
+      border-radius: 999px;
+      padding: 4px 9px;
+      border: 1px solid rgba(75, 85, 99, 0.9);
+      background: rgba(15, 23, 42, 0.9);
+      color: #e5e7eb;
+    }
+
+    footer {
+      padding: 10px 20px 14px;
+      border-top: 1px solid rgba(15, 23, 42, 0.9);
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .footer-pill {
+      border-radius: 999px;
+      padding: 4px 10px;
+      background: rgba(15, 23, 42, 0.96);
+      border: 1px solid rgba(51, 65, 85, 0.9);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .footer-pill span {
+      font-size: 0.72rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header>
+      <div class="brand">
+        <div class="logo-dot"></div>
+        <div class="brand-text">
+          <div class="brand-title">
+            JobPulse Lahore
+            <span class="brand-badge">MVP  ·  Local Talent Radar</span>
+          </div>
+          <div class="brand-subtitle">
+            Curating Python, Django & early-career roles around Lahore.
+          </div>
+        </div>
+      </div>
+      <div class="meta">
+        <div class="meta-pill">
+          <span style="width: 7px; height: 7px; border-radius: 999px; background:#22c55e; box-shadow:0 0 0 1px rgba(22,163,74,0.7);"></span>
+          <span>Backend-powered shortlist · server-filtered</span>
+        </div>
+        <span>Last updated: {{ stats.last_updated }}</span>
+      </div>
+    </header>
+
+    <main>
+      <section class="jobs-panel">
+        <div class="panel-inner">
+          <div class="panel-header">
+            <div class="panel-title">Live snapshot</div>
+            <span class="badge-soft">
+              {{ stats.total_jobs }} roles · {{ stats.sources_count }} source{{ 's' if stats.sources_count != 1 else '' }}
+            </span>
+          </div>
+
+          <div class="stats-row">
+            <div class="stat-pill stat-highlight">
+              <span class="stat-label">Total roles</span>
+              <span class="stat-value">{{ stats.total_jobs }}</span>
+            </div>
+            <div class="stat-pill">
+              <span class="stat-label">New today</span>
+              <span class="stat-value">{{ stats.new_today }}</span>
+            </div>
+            <div class="stat-pill">
+              <span class="stat-label">Sources</span>
+              <span class="stat-value">{{ stats.sources_count }}</span>
+            </div>
+          </div>
+
+          {% if jobs %}
+          <div class="jobs-list">
+            {% for job in jobs %}
+            <article class="job-card">
+              <div class="job-main">
+                <div class="job-title-row">
+                  <h2 class="job-title">{{ job.title }}</h2>
+                  <span class="pill pill-pill-blue">
+                    <span class="pill-dot"></span>
+                    {{ job.location }}
+                  </span>
+                </div>
+                <div class="job-company">{{ job.company }}</div>
+                <div class="job-tags">
+                  <span class="pill">
+                    <span style="width:6px;height:6px;border-radius:999px;background:#38bdf8;"></span>
+                    Source · {{ job.source|capitalize }}
+                  </span>
+                  <span class="pill pill-pill-amber">
+                    <span style="width:6px;height:6px;border-radius:999px;background:#fbbf24;"></span>
+                    Role type · {{ job.role_type|capitalize }}
+                  </span>
+                </div>
+              </div>
+              <div class="job-meta">
+                <span class="posted-pill">
+                  Posted · {{ job.posted_date }}
+                </span>
+                <a
+                  href="{{ job.apply_url }}"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="apply-link"
+                >
+                  <span>Open original listing</span>
+                  <span>↗</span>
+                </a>
+              </div>
+            </article>
+            {% endfor %}
+          </div>
+          {% else %}
+          <div class="empty-state">
+            <div class="empty-title">No roles match the current filters.</div>
+            <div class="empty-text">
+              Try clearing the search, switching sources, or broadening the role type to see more opportunities.
+            </div>
+            <div class="empty-hint">
+              <span class="chip">Hint: leave search blank to see all roles</span>
+              <span class="chip">Intern, trainee & junior tracks supported</span>
+            </div>
+          </div>
+          {% endif %}
+        </div>
+      </section>
+
+      <aside class="filters-panel">
+        <div class="panel-inner">
+          <div class="panel-header">
+            <div class="panel-title">Filters</div>
+            <span class="badge-soft">Server-side · query params</span>
+          </div>
+
+          <form method="get" action="/">
+            <div class="filters-grid">
+              <div class="field">
+                <label class="field-label" for="q">Search</label>
+                <input
+                  id="q"
+                  type="text"
+                  name="q"
+                  placeholder="Python, Django, Intern, Company..."
+                  value="{{ filters.q }}"
+                />
+              </div>
+
+              <div class="field">
+                <label class="field-label" for="source">Source</label>
+                <select id="source" name="source">
+                  <option value="" {% if not filters.source %}selected{% endif %}>Any</option>
+                  <option value="indeed" {% if filters.source == 'indeed' %}selected{% endif %}>
+                    Indeed
+                  </option>
+                  <option value="rozee" {% if filters.source == 'rozee' %}selected{% endif %}>
+                    Rozee
+                  </option>
+                </select>
+              </div>
+
+              <div class="field">
+                <label class="field-label" for="role_type">Role type</label>
+                <select id="role_type" name="role_type">
+                  <option value="" {% if not filters.role_type %}selected{% endif %}>Any</option>
+                  <option value="intern" {% if filters.role_type == 'intern' %}selected{% endif %}>
+                    Intern
+                  </option>
+                  <option value="trainee" {% if filters.role_type == 'trainee' %}selected{% endif %}>
+                    Trainee
+                  </option>
+                </select>
+              </div>
+            </div>
+
+            <div class="actions-row">
+              <a href="/" class="btn-secondary" style="text-decoration:none;">
+                Reset
+              </a>
+              <button type="submit" class="btn-primary">
+                Apply filters
+              </button>
+            </div>
+          </form>
+        </div>
+      </aside>
+    </main>
+
+    <footer>
+      <span>FastAPI · Jinja2 · Uvicorn · MVP-only in-memory dataset.</span>
+      <span class="footer-pill">
+        <span style="width:7px;height:7px;border-radius:999px;background:#22c55e;"></span>
+        <span>Backend-first filtering · no SPA required</span>
+      </span>
+    </footer>
+  </div>
+</body>
+</html>
+

@@ -1,21 +1,34 @@
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
+import logging
 import os
+import time
+from urllib.parse import urlencode, quote
 
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
+from fastapi.responses import HTMLResponse, RedirectResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from .db import init_db, insert_jobs
-from .repo import list_jobs
+from .repo import count_jobs, list_jobs
 from .scrapers.github_jobs import scrape_github_jobs
 from .scrapers.remoteok import scrape_remoteok_python
 from .scrapers.rozee import scrape_rozee_python_lahore
 from .scrapers.weworkremotely import scrape_weworkremotely
 
+# --- Structured logging ---
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)s | %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+logger = logging.getLogger(__name__)
+
 app = FastAPI(title="JobPulse Lahore")
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
+REFRESH_COOLDOWN_SEC = 30
+_last_refresh_at: float | None = None
 
 @app.get("/favicon.ico", include_in_schema=False)
 def favicon() -> Response:
@@ -25,7 +38,6 @@ def favicon() -> Response:
 
 templates = Jinja2Templates(directory="app/templates")
 
-# MVP data: hardcoded list (used to seed DB on first run)
 JOBS = [
     {
         "title": "Python Intern",
@@ -57,6 +69,31 @@ def bootstrap_db() -> None:
         init_db()
 
 
+def _run_source(
+    name: str,
+    fetch_fn,
+    insert_fn,
+) -> tuple[int, int, str]:
+    """Run one scraper; return (fetched, inserted, status_string)."""
+    start = time.perf_counter()
+    try:
+        jobs = fetch_fn()
+        inserted = insert_fn(jobs)
+        duration_ms = int((time.perf_counter() - start) * 1000)
+        logger.info(
+            "refresh source=%s fetched=%s inserted=%s duration_ms=%s",
+            name, len(jobs), inserted, duration_ms,
+        )
+        return len(jobs), inserted, "ok"
+    except Exception as e:  # noqa: BLE001
+        duration_ms = int((time.perf_counter() - start) * 1000)
+        logger.warning(
+            "refresh source=%s error=%s duration_ms=%s",
+            name, str(e), duration_ms,
+        )
+        return 0, 0, str(e)[:80].replace(" ", "_")
+
+
 @app.get("/", response_class=HTMLResponse)
 def dashboard(
     request: Request,
@@ -64,10 +101,13 @@ def dashboard(
     source: str = "",
     role_type: str = "",
     location: str = "",
+    page: int = 1,
+    limit: int = 20,
     days: str = "",
     refreshed: str = "",
     fetched: str = "",
     inserted: str = "",
+    refresh_status: str = "",
     rozee_fetched: str = "",
     rozee_inserted: str = "",
     remoteok_fetched: str = "",
@@ -76,35 +116,21 @@ def dashboard(
     weworkremotely_inserted: str = "",
     github_jobs_fetched: str = "",
     github_jobs_inserted: str = "",
+    rate_limited: str = "",
 ):
-    """
-    Server-side filtering using query params backed by SQLite.
-    refreshed/fetched/inserted and rozee_*/remoteok_* come from redirect after /refresh.
-    """
-    jobs = list_jobs(q=q, source=source, role_type=role_type, location=location)
-
-    # Mark jobs added in the last 48h as "new" for highlighting
-    cutoff = datetime.now(timezone.utc) - timedelta(hours=48)
-    for j in jobs:
-        j["is_new"] = False
-        raw = j.get("scraped_at")
-        if raw:
-            try:
-                # scraped_at is ISO string (e.g. 2026-02-26T12:00:00)
-                if raw.endswith("Z"):
-                    raw = raw.replace("Z", "+00:00")
-                t = datetime.fromisoformat(raw)
-                if t.tzinfo is None:
-                    t = t.replace(tzinfo=timezone.utc)
-                j["is_new"] = t >= cutoff
-            except (ValueError, TypeError):
-                pass
+    """Dashboard with filters, pagination, and refresh flash."""
+    offset = (page - 1) * limit
+    jobs = list_jobs(
+        q=q, source=source, role_type=role_type, location=location,
+        limit=limit, offset=offset,
+    )
+    total = count_jobs(q=q, source=source, role_type=role_type, location=location)
+    has_more = offset + len(jobs) < total
+    total_pages = (total + limit - 1) // limit if limit else 1
 
     stats = {
-        "total_jobs": len(jobs),
-        "new_today": sum(
-            1 for j in jobs if j["posted_date"].lower() == "today"
-        ),
+        "total_jobs": total,
+        "new_today": sum(1 for j in jobs if (j.get("posted_date") or "").lower() == "today"),
         "sources_count": len(set(j["source"] for j in jobs)),
         "last_updated": datetime.now().strftime("%Y-%m-%d %H:%M"),
     }
@@ -114,6 +140,7 @@ def dashboard(
         "refreshed": refreshed,
         "fetched": fetched,
         "inserted": inserted,
+        "refresh_status": refresh_status,
         "rozee_fetched": rozee_fetched,
         "rozee_inserted": rozee_inserted,
         "remoteok_fetched": remoteok_fetched,
@@ -122,7 +149,13 @@ def dashboard(
         "weworkremotely_inserted": weworkremotely_inserted,
         "github_jobs_fetched": github_jobs_fetched,
         "github_jobs_inserted": github_jobs_inserted,
+        "rate_limited": rate_limited,
     }
+
+    export_params = {k: v for k, v in [("q", q), ("source", source), ("role_type", role_type), ("location", location)] if v}
+    export_url = "/export.csv" + ("?" + urlencode(export_params) if export_params else "")
+    load_more_params = [(k, v) for k, v in [("page", page + 1), ("q", q), ("source", source), ("role_type", role_type), ("location", location)] if v]
+    load_more_url = "/?" + urlencode(load_more_params)
 
     return templates.TemplateResponse(
         "dashboard.html",
@@ -132,6 +165,13 @@ def dashboard(
             "stats": stats,
             "filters": filters,
             "flash": flash,
+            "page": page,
+            "limit": limit,
+            "total": total,
+            "total_pages": total_pages,
+            "has_more": has_more,
+            "export_url": export_url,
+            "load_more_url": load_more_url,
         },
     )
 
@@ -140,49 +180,84 @@ def dashboard(
 @app.get("/refresh")
 def refresh() -> RedirectResponse:
     """
-    Run all scrapers (Rozee, RemoteOK, We Work Remotely, GitHub Jobs),
-    write to DB, redirect with per-source counts.
+    Run all scrapers with per-source try/except; rate limit 30s.
+    Redirect with partial-success status (e.g. RemoteOK ok, Rozee blocked).
     """
-    rozee_jobs = scrape_rozee_python_lahore(max_pages=1, delay_sec=1.0)
-    remoteok_jobs = scrape_remoteok_python(limit=30)
-    weworkremotely_jobs = scrape_weworkremotely(limit=50)
-    github_jobs = scrape_github_jobs(limit=30)
+    global _last_refresh_at
+    now = time.perf_counter()
+    if _last_refresh_at is not None and (now - _last_refresh_at) < REFRESH_COOLDOWN_SEC:
+        logger.warning("refresh rate_limited cooldown_sec=%s", REFRESH_COOLDOWN_SEC)
+        return RedirectResponse(
+            url="/?rate_limited=1&refreshed=0",
+            status_code=303,
+        )
 
-    rozee_inserted = insert_jobs(rozee_jobs)
-    remoteok_inserted = insert_jobs(remoteok_jobs)
-    weworkremotely_inserted = insert_jobs(weworkremotely_jobs)
-    github_jobs_inserted = insert_jobs(github_jobs)
+    status_parts: list[str] = []
+    total_fetched = 0
+    total_inserted = 0
+    results = {}
 
-    print("SCRAPER Rozee fetched:", len(rozee_jobs), "inserted:", rozee_inserted)
-    print("SCRAPER RemoteOK fetched:", len(remoteok_jobs), "inserted:", remoteok_inserted)
-    print(
-        "SCRAPER We Work Remotely fetched:",
-        len(weworkremotely_jobs),
-        "inserted:",
-        weworkremotely_inserted,
-    )
-    print("SCRAPER GitHub Jobs fetched:", len(github_jobs), "inserted:", github_jobs_inserted)
+    def run(name: str, fetch_fn, insert_fn):
+        nonlocal total_fetched, total_inserted
+        f, i, st = _run_source(name, fetch_fn, insert_fn)
+        total_fetched += f
+        total_inserted += i
+        results[name] = (f, i, st)
+        if st == "ok":
+            status_parts.append(f"{name} ok")
+        else:
+            status_parts.append(f"{name} {st}")
 
-    total_fetched = (
-        len(rozee_jobs)
-        + len(remoteok_jobs)
-        + len(weworkremotely_jobs)
-        + len(github_jobs)
-    )
-    total_inserted = (
-        rozee_inserted
-        + remoteok_inserted
-        + weworkremotely_inserted
-        + github_jobs_inserted
-    )
+    run("Rozee", lambda: scrape_rozee_python_lahore(max_pages=1, delay_sec=1.0), insert_jobs)
+    run("RemoteOK", lambda: scrape_remoteok_python(limit=30), insert_jobs)
+    run("WWR", lambda: scrape_weworkremotely(limit=50), insert_jobs)
+    run("GitHubJobs", lambda: scrape_github_jobs(limit=30), insert_jobs)
+
+    _last_refresh_at = time.perf_counter()
+    refresh_status = ", ".join(status_parts)
 
     params = (
-        f"?refreshed=1"
-        f"&fetched={total_fetched}&inserted={total_inserted}"
-        f"&rozee_fetched={len(rozee_jobs)}&rozee_inserted={rozee_inserted}"
-        f"&remoteok_fetched={len(remoteok_jobs)}&remoteok_inserted={remoteok_inserted}"
-        f"&weworkremotely_fetched={len(weworkremotely_jobs)}&weworkremotely_inserted={weworkremotely_inserted}"
-        f"&github_jobs_fetched={len(github_jobs)}&github_jobs_inserted={github_jobs_inserted}"
+        f"?refreshed=1&fetched={total_fetched}&inserted={total_inserted}"
+        f"&rozee_fetched={results['Rozee'][0]}&rozee_inserted={results['Rozee'][1]}"
+        f"&remoteok_fetched={results['RemoteOK'][0]}&remoteok_inserted={results['RemoteOK'][1]}"
+        f"&weworkremotely_fetched={results['WWR'][0]}&weworkremotely_inserted={results['WWR'][1]}"
+        f"&github_jobs_fetched={results['GitHubJobs'][0]}&github_jobs_inserted={results['GitHubJobs'][1]}"
+        f"&refresh_status={quote(refresh_status, safe='')}"
     )
     return RedirectResponse(url="/" + params, status_code=303)
 
+
+@app.get("/export.csv", include_in_schema=False)
+def export_csv(
+    q: str = "",
+    source: str = "",
+    role_type: str = "",
+    location: str = "",
+):
+    """Export jobs matching current filters as CSV."""
+    import csv
+    import io
+
+    jobs = list_jobs(
+        q=q, source=source, role_type=role_type, location=location,
+        limit=10000, offset=0,
+    )
+    out = io.StringIO()
+    w = csv.writer(out)
+    w.writerow(["title", "company", "location", "source", "role_type", "posted_date", "apply_url"])
+    for j in jobs:
+        w.writerow([
+            j.get("title", ""),
+            j.get("company", ""),
+            j.get("location", ""),
+            j.get("source", ""),
+            j.get("role_type", ""),
+            j.get("posted_date", ""),
+            j.get("apply_url", ""),
+        ])
+    body = out.getvalue()
+    return Response(
+        content=body,
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=jobs.csv"},
+    )

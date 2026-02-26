@@ -36,9 +36,18 @@
       </div>
     </header>
 
+    {% if flash.rate_limited %}
+    <div class="alert alert-warning">
+      Please wait {{ 30 }} seconds between refreshes. Try again shortly.
+    </div>
+    {% endif %}
+
     {% if flash.refreshed %}
     <div class="alert alert-info">
       Refresh complete — total fetched {{ flash.fetched }}, inserted {{ flash.inserted }} new.
+      {% if flash.refresh_status %}
+      <br /><span class="refresh-status">{{ flash.refresh_status }}</span>
+      {% endif %}
       <br />
       <strong>Rozee:</strong> fetched {{ flash.rozee_fetched }}, inserted {{ flash.rozee_inserted }}.
       <strong>RemoteOK:</strong> fetched {{ flash.remoteok_fetched }}, inserted {{ flash.remoteok_inserted }}.
@@ -80,7 +89,7 @@
                 <div class="job-title-row">
                   <h2 class="job-title">{{ job.title }}</h2>
                   {% if job.is_new %}
-                  <span class="pill pill-new">New</span>
+                  <span class="pill pill-new badge-new">New</span>
                   {% endif %}
                   <span class="pill pill-pill-blue">
                     <span class="pill-dot"></span>
@@ -116,6 +125,16 @@
             </article>
             {% endfor %}
           </div>
+          {% if has_more %}
+          <p class="load-more-row">
+            <a href="{{ load_more_url }}" class="btn-secondary" style="text-decoration:none;">Load more</a>
+            <span class="page-info">Page {{ page }} of {{ total_pages }} ({{ total }} total)</span>
+          </p>
+          {% elif total_pages > 1 %}
+          <p class="load-more-row">
+            <span class="page-info">Page {{ page }} of {{ total_pages }} ({{ total }} total)</span>
+          </p>
+          {% endif %}
           {% else %}
           <div class="empty-state">
             <div class="empty-title">No roles match the current filters.</div>
@@ -201,6 +220,7 @@
             </div>
 
             <div class="actions-row">
+              <a href="{{ export_url }}" class="btn-export" download>Download CSV</a>
               <a href="/" class="btn-secondary" style="text-decoration:none;">
                 Reset
               </a>

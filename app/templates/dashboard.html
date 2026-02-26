@@ -36,13 +36,24 @@
       </div>
     </header>
 
+    {% if flash.refreshed %}
+    <div class="alert alert-info">
+      Refresh complete — total fetched {{ flash.fetched }}, inserted {{ flash.inserted }} new.
+      <br />
+      <strong>Rozee:</strong> fetched {{ flash.rozee_fetched }}, inserted {{ flash.rozee_inserted }}.
+      <strong>RemoteOK:</strong> fetched {{ flash.remoteok_fetched }}, inserted {{ flash.remoteok_inserted }}.
+      <strong>We Work Remotely:</strong> fetched {{ flash.weworkremotely_fetched }}, inserted {{ flash.weworkremotely_inserted }}.
+      <strong>GitHub Jobs:</strong> fetched {{ flash.github_jobs_fetched }}, inserted {{ flash.github_jobs_inserted }}.
+    </div>
+    {% endif %}
+
     <main>
       <section class="jobs-panel">
         <div class="panel-inner">
           <div class="panel-header">
             <div class="panel-title">Live snapshot</div>
             <span class="badge-soft">
-              {{ stats.total_jobs }} roles · {{ stats.sources_count }} source{{ 's' if stats.sources_count != 1 else '' }}
+              {{ stats.total_jobs }} roles · {{ stats.sources_count }} source{{ 's' if stats.sources_count != 1 else '' }} · newest first
             </span>
           </div>
 
@@ -64,10 +75,13 @@
           {% if jobs %}
           <div class="jobs-list">
             {% for job in jobs %}
-            <article class="job-card">
+            <article class="job-card{% if job.is_new %} job-card-new{% endif %}">
               <div class="job-main">
                 <div class="job-title-row">
                   <h2 class="job-title">{{ job.title }}</h2>
+                  {% if job.is_new %}
+                  <span class="pill pill-new">New</span>
+                  {% endif %}
                   <span class="pill pill-pill-blue">
                     <span class="pill-dot"></span>
                     {{ job.location }}
@@ -147,6 +161,15 @@
                   <option value="rozee" {% if filters.source == 'rozee' %}selected{% endif %}>
                     Rozee
                   </option>
+                  <option value="remoteok" {% if filters.source == 'remoteok' %}selected{% endif %}>
+                    RemoteOK
+                  </option>
+                  <option value="weworkremotely" {% if filters.source == 'weworkremotely' %}selected{% endif %}>
+                    We Work Remotely
+                  </option>
+                  <option value="github_jobs" {% if filters.source == 'github_jobs' %}selected{% endif %}>
+                    GitHub Jobs
+                  </option>
                 </select>
               </div>
 
@@ -159,6 +182,19 @@
                   </option>
                   <option value="trainee" {% if filters.role_type == 'trainee' %}selected{% endif %}>
                     Trainee
+                  </option>
+                </select>
+              </div>
+
+              <div class="field">
+                <label class="field-label" for="location">Location</label>
+                <select id="location" name="location">
+                  <option value="" {% if not filters.location %}selected{% endif %}>Any</option>
+                  <option value="lahore" {% if filters.location == 'lahore' %}selected{% endif %}>
+                    Lahore (local)
+                  </option>
+                  <option value="remote" {% if filters.location == 'remote' %}selected{% endif %}>
+                    Remote
                   </option>
                 </select>
               </div>

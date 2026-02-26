@@ -2,6 +2,12 @@
 Rozee.pk scraper for Python / Lahore job listings.
 
 Output dicts match the jobs table schema (without scraped_at; add at insert time).
+
+NOTE — Cloudflare: Rozee may return "Access denied" (Error 1005) for plain
+requests. To test or run in production, use Playwright (or similar) to drive
+a real browser and pass the Cloudflare challenge, then parse the resulting HTML.
+Example: pip install playwright && playwright install chromium;
+use sync_playwright() and page.goto(BASE_URL), then page.content() for soup.
 """
 from __future__ import annotations
 
@@ -67,11 +73,21 @@ def scrape_rozee_python_lahore(
 
         soup = BeautifulSoup(resp.text, "html.parser")
 
+        # Temporary debug: confirm Rozee HTML is loaded
+        print("PAGE TITLE:", soup.title.get_text() if soup.title else "No title")
+        print("HTML LENGTH:", len(resp.text))
+
         # Rozee markup may change; adjust selectors if the site updates.
-        job_cards = soup.select("div.job")
+        job_cards = soup.select("li.job, div.job, .job, .job-listing, .job-list")
+
+        if not job_cards:
+            print("⚠️ No job cards found — HTML structure likely changed")
 
         for card in job_cards:
-            title_el = card.select_one("h3 a, h2 a, a.jobtitle")
+            # Temporary debug: show actual card structure
+            print("CARD HTML:", str(card)[:200])
+
+            title_el = card.select_one("a")
             company_el = card.select_one(".comp-name, .company")
             location_el = card.select_one(".location, .loc")
             date_el = card.select_one(".date, .posted, .job-date")

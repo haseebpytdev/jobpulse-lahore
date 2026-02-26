@@ -100,6 +100,50 @@ def init_db(sample_jobs: Optional[List[Mapping[str, Any]]] = None) -> None:
       )
 
 
+def insert_jobs(jobs: List[Mapping[str, Any]]) -> int:
+  """
+  Insert scraped jobs into the DB. Adds scraped_at; UNIQUE(apply_url) skips duplicates.
+  Returns the number of rows actually inserted.
+  """
+  if not jobs:
+    return 0
+  now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+  payload: List[Dict[str, Any]] = []
+  for job in jobs:
+    payload.append(
+      {
+        "title": job["title"],
+        "company": job["company"],
+        "location": job["location"],
+        "source": job["source"],
+        "role_type": job["role_type"],
+        "posted_date_text": job.get("posted_date_text") or job.get("posted_date", ""),
+        "posted_at": job.get("posted_at"),
+        "apply_url": job["apply_url"],
+        "scraped_at": now,
+      }
+    )
+  inserted = 0
+  with get_conn() as conn:
+    cur = conn.cursor()
+    for row in payload:
+      cur.execute(
+        """
+        INSERT OR IGNORE INTO jobs (
+            title, company, location, source, role_type,
+            posted_date_text, posted_at, apply_url, scraped_at
+        )
+        VALUES (
+            :title, :company, :location, :source, :role_type,
+            :posted_date_text, :posted_at, :apply_url, :scraped_at
+        );
+        """,
+        row,
+      )
+      inserted += cur.rowcount
+  return inserted
+
+
 if __name__ == "__main__":
   from .main import JOBS  # type: ignore
 

@@ -5,11 +5,14 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
+from .db import init_db
+from .repo import list_jobs
+
 app = FastAPI(title="JobPulse Lahore")
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 templates = Jinja2Templates(directory="app/templates")
 
-# MVP data: hardcoded list (replace later with DB)
+# MVP data: hardcoded list (used to seed DB on first run)
 JOBS = [
     {
         "title": "Python Intern",
@@ -32,6 +35,14 @@ JOBS = [
 ]
 
 
+@app.on_event("startup")
+def bootstrap_db() -> None:
+    """
+    Ensure SQLite schema exists and seed with JOBS once.
+    """
+    init_db(sample_jobs=JOBS)
+
+
 @app.get("/", response_class=HTMLResponse)
 def dashboard(
     request: Request,
@@ -41,29 +52,16 @@ def dashboard(
     days: str = "",
 ):
     """
-    Server-side filtering using query params.
-    Why: Simple, robust, and proves backend competency.
+    Server-side filtering using query params backed by SQLite.
     """
-    filtered = JOBS
-
-    if q:
-        q_lower = q.lower()
-        filtered = [
-            j
-            for j in filtered
-            if q_lower in j["title"].lower() or q_lower in j["company"].lower()
-        ]
-    if source:
-        filtered = [j for j in filtered if j["source"] == source]
-    if role_type:
-        filtered = [j for j in filtered if j["role_type"] == role_type]
+    jobs = list_jobs(q=q, source=source, role_type=role_type)
 
     stats = {
-        "total_jobs": len(filtered),
+        "total_jobs": len(jobs),
         "new_today": sum(
-            1 for j in filtered if j["posted_date"].lower() == "today"
+            1 for j in jobs if j["posted_date"].lower() == "today"
         ),
-        "sources_count": len(set(j["source"] for j in filtered)),
+        "sources_count": len(set(j["source"] for j in jobs)),
         "last_updated": datetime.now().strftime("%Y-%m-%d %H:%M"),
     }
 
@@ -71,6 +69,6 @@ def dashboard(
 
     return templates.TemplateResponse(
         "dashboard.html",
-        {"request": request, "jobs": filtered, "stats": stats, "filters": filters},
+        {"request": request, "jobs": jobs, "stats": stats, "filters": filters},
     )
 

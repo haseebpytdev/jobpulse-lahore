@@ -1,6 +1,6 @@
 from typing import Any, Dict, List, Mapping
 
-from .db import get_conn
+from .db import db_conn
 
 
 def list_jobs(
@@ -8,16 +8,15 @@ def list_jobs(
     source: str = "",
     role_type: str = "",
     location: str = "",
+    freshness: str = "",
     limit: int = 50,
     offset: int = 0,
 ) -> List[Mapping[str, Any]]:
     """
     Repository layer for job queries.
 
-    Hides raw SQL behind a small, focused API that:
-    - Mirrors the current filter behaviour (q, source, role_type, location)
-    - Returns dict-like rows suitable for templating; is_new = 1 if inserted in last 24h (by scraped_at).
-    - Supports limit/offset for pagination.
+    - freshness: "" = any, "new_today" = first_seen in last 24h, "last_3_days" = first_seen in last 72h.
+    - Returns dict-like rows with is_new = 1 if first_seen_at in last 24h.
     """
     sql_parts = [
         "SELECT title, company, location, source, role_type,",
@@ -28,6 +27,11 @@ def list_jobs(
         "WHERE is_active = 1",
     ]
     params: List[object] = []
+
+    if freshness == "new_today":
+        sql_parts.append("AND datetime(COALESCE(first_seen_at, scraped_at)) >= datetime('now', '-1 day')")
+    elif freshness == "last_3_days":
+        sql_parts.append("AND datetime(COALESCE(first_seen_at, scraped_at)) >= datetime('now', '-3 days')")
 
     if q:
         sql_parts.append("AND (LOWER(title) LIKE ? OR LOWER(company) LIKE ?)")
@@ -56,7 +60,7 @@ def list_jobs(
     params.extend([limit, offset])
     query = " ".join(sql_parts)
 
-    with get_conn() as conn:
+    with db_conn() as conn:
         cur = conn.cursor()
         cur.execute(query, params)
         rows = cur.fetchall()
@@ -68,10 +72,16 @@ def count_jobs(
     source: str = "",
     role_type: str = "",
     location: str = "",
+    freshness: str = "",
 ) -> int:
     """Return total number of jobs matching the same filters as list_jobs (for pagination)."""
     sql_parts = ["SELECT COUNT(*) FROM jobs", "WHERE is_active = 1"]
     params: List[object] = []
+
+    if freshness == "new_today":
+        sql_parts.append("AND datetime(COALESCE(first_seen_at, scraped_at)) >= datetime('now', '-1 day')")
+    elif freshness == "last_3_days":
+        sql_parts.append("AND datetime(COALESCE(first_seen_at, scraped_at)) >= datetime('now', '-3 days')")
 
     if q:
         sql_parts.append("AND (LOWER(title) LIKE ? OR LOWER(company) LIKE ?)")
@@ -93,7 +103,7 @@ def count_jobs(
             params.append("%remote%")
 
     query = " ".join(sql_parts)
-    with get_conn() as conn:
+    with db_conn() as conn:
         cur = conn.cursor()
         cur.execute(query, params)
         return cur.fetchone()[0]

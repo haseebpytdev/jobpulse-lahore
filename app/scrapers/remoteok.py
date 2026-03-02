@@ -2,30 +2,62 @@
 RemoteOK scraper — fetches jobs from the public JSON API.
 
 No HTML parsing; stable and not blocked by Cloudflare.
+Hardened: shorter timeout, retry with backoff, returns [] on failure (SSL/network).
 Output dicts match the jobs table schema (without scraped_at).
 """
 from __future__ import annotations
 
+import logging
+import time
 from typing import Any, Dict, List
 
 import requests
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
 }
 
+REMOTEOK_TIMEOUT = 10
+REMOTEOK_RETRIES = 3
+REMOTEOK_BACKOFF = [1, 2, 4]  # seconds before each retry
 
-def scrape_remoteok_python(limit: int = 30) -> List[Dict[str, Any]]:
+
+def scrape_remoteok(
+    query: str = "",
+    location: str = "",
+    limit: int = 50,
+) -> List[Dict[str, Any]]:
     """
-    RemoteOK provides a JSON endpoint.
-    Stable ingestion, no HTML parsing brittleness.
+    Fetch jobs from RemoteOK JSON API. No server-side search; returns all and caller
+    should filter by query/location (e.g. via filter_jobs). Uses 10s timeout, retries with backoff.
     """
     url = "https://remoteok.com/api"
-    resp = requests.get(url, headers=DEFAULT_HEADERS, timeout=20)
-    resp.raise_for_status()
+    last_error: Exception | None = None
+
+    for attempt in range(REMOTEOK_RETRIES):
+        try:
+            resp = requests.get(
+                url, headers=DEFAULT_HEADERS, timeout=REMOTEOK_TIMEOUT
+            )
+            resp.raise_for_status()
+            break
+        except requests.RequestException as e:
+            last_error = e
+            logger.warning(
+                "RemoteOK attempt %s/%s failed: %s",
+                attempt + 1,
+                REMOTEOK_RETRIES,
+                e,
+            )
+            if attempt < REMOTEOK_RETRIES - 1:
+                time.sleep(REMOTEOK_BACKOFF[attempt])
+    else:
+        logger.error("RemoteOK all attempts failed: %s", last_error)
+        return []
 
     data = resp.json()
-    # First element is metadata; the rest are jobs
     jobs = [j for j in data[1:] if isinstance(j, dict)]
 
     out: List[Dict[str, Any]] = []
@@ -38,11 +70,7 @@ def scrape_remoteok_python(limit: int = 30) -> List[Dict[str, Any]]:
         if not title or not apply_url:
             continue
 
-        # Filter to Python-ish
-        if "python" not in title.lower() and "python" not in tags:
-            continue
-
-        # Role type heuristic
+        # No hardcoded "python" filter — filter_jobs() applies query/location
         lt = title.lower()
         role_type = (
             "intern"
@@ -66,8 +94,7 @@ def scrape_remoteok_python(limit: int = 30) -> List[Dict[str, Any]]:
                 "apply_url": apply_url,
             }
         )
-
-        if len(out) >= limit:
+        if len(out) >= limit * 3:
             break
 
     return out

@@ -19,5 +19,5 @@ class GitHubJobsScraper:
         limit: int = 50,
     ) -> list[JobIn]:
         fetch_limit = min(limit * 3, 200) if (query or location) else limit
-        jobs = scrape_github_jobs(limit=fetch_limit)
+        jobs = scrape_github_jobs(query=query, location=location, limit=fetch_limit)
         return filter_jobs(jobs, query=query, location=location, limit=limit)

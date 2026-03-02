@@ -11,14 +11,14 @@ def get_conn() -> sqlite3.Connection:
     """
     Return a SQLite connection.
 
-    - Uses uri=True so file:... URIs (e.g. shared in-memory DBs) work correctly.
+    - Uses uri=True only for file:... URIs (e.g. shared in-memory DBs); plain paths work for temp files.
     - Uses check_same_thread=False so the same connection can be shared across threads if needed.
     """
     db_str = str(DB_PATH)
-    # Ensure on-disk DB directory exists; for URI-style DBs (file:...) this is a no-op.
-    if not db_str.startswith("file:"):
+    use_uri = db_str.startswith("file:")
+    if not use_uri:
         Path(db_str).parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(db_str, uri=True, check_same_thread=False)
+    conn = sqlite3.connect(db_str, uri=use_uri, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -88,6 +88,7 @@ def init_db(sample_jobs: Optional[List[Mapping[str, Any]]] = None) -> None:
       "CREATE INDEX IF NOT EXISTS idx_jobs_scraped_at ON jobs(scraped_at);"
     )
     cur.execute("CREATE INDEX IF NOT EXISTS idx_jobs_last_seen_at ON jobs(last_seen_at);")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_jobs_first_seen_at ON jobs(first_seen_at);")
 
     if sample_jobs:
       now = datetime.now(timezone.utc).isoformat(timespec="seconds")

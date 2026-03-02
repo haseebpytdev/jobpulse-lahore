@@ -1,15 +1,15 @@
 """
-Adapter: Rozee.pk → Scraper protocol.
+Adapter: Mustakbil (Pakistan) → Scraper protocol.
 """
 from __future__ import annotations
 
 from app.models import JobIn
 from app.scrapers.base import Scraper, filter_jobs
-from app.scrapers.rozee import scrape_rozee
+from app.scrapers.mustakbil import scrape_mustakbil
 
 
-class RozeeScraper:
-    name = "rozee"
+class MustakbilScraper:
+    name = "mustakbil"
 
     def fetch(
         self,
@@ -18,7 +18,7 @@ class RozeeScraper:
         location: str = "",
         limit: int = 50,
     ) -> list[JobIn]:
-        jobs = scrape_rozee(
+        jobs = scrape_mustakbil(
             query=query,
             location=location,
             limit=limit,

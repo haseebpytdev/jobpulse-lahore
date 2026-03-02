@@ -1,15 +1,17 @@
 """
-Adapter: Rozee.pk → Scraper protocol.
+Adapter: Indeed (Pakistan + Global) — stub.
+
+Uncomment and register when scrape_indeed is implemented (Playwright/API).
 """
 from __future__ import annotations
 
 from app.models import JobIn
 from app.scrapers.base import Scraper, filter_jobs
-from app.scrapers.rozee import scrape_rozee
+from app.scrapers.indeed import scrape_indeed
 
 
-class RozeeScraper:
-    name = "rozee"
+class IndeedScraper:
+    name = "indeed"
 
     def fetch(
         self,
@@ -18,11 +20,5 @@ class RozeeScraper:
         location: str = "",
         limit: int = 50,
     ) -> list[JobIn]:
-        jobs = scrape_rozee(
-            query=query,
-            location=location,
-            limit=limit,
-            max_pages=3,
-            delay_sec=1.0,
-        )
+        jobs = scrape_indeed(query=query, location=location, limit=limit)
         return filter_jobs(jobs, query=query, location=location, limit=limit)

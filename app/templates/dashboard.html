@@ -56,21 +56,24 @@
               </div>
             </div>
 
-            {% if filters.source or filters.role_type or filters.location or filters.q %}
+            {% if filters.source or filters.role_type or filters.location or filters.q or filters.freshness %}
             <div class="active-filters">
               <span class="filter-label">Active filters</span>
               <div class="filter-chips">
                 {% if filters.source %}
-                <a href="/?q={{ filters.q }}&role_type={{ filters.role_type }}&location={{ filters.location }}" class="chip">{{ filters.source | replace('_', ' ') | title }} &times;</a>
+                <a href="/?q={{ filters.q }}&role_type={{ filters.role_type }}&location={{ filters.location }}&days={{ filters.freshness }}" class="chip">{{ filters.source | replace('_', ' ') | title }} &times;</a>
                 {% endif %}
                 {% if filters.role_type %}
-                <a href="/?q={{ filters.q }}&source={{ filters.source }}&location={{ filters.location }}" class="chip">{{ filters.role_type | title }} &times;</a>
+                <a href="/?q={{ filters.q }}&source={{ filters.source }}&location={{ filters.location }}&days={{ filters.freshness }}" class="chip">{{ filters.role_type | title }} &times;</a>
                 {% endif %}
                 {% if filters.location %}
-                <a href="/?q={{ filters.q }}&source={{ filters.source }}&role_type={{ filters.role_type }}" class="chip">{{ 'Lahore (local)' if filters.location == 'lahore' else 'Remote' }} &times;</a>
+                <a href="/?q={{ filters.q }}&source={{ filters.source }}&role_type={{ filters.role_type }}&days={{ filters.freshness }}" class="chip">{{ 'Lahore (local)' if filters.location == 'lahore' else 'Remote' }} &times;</a>
+                {% endif %}
+                {% if filters.freshness %}
+                <a href="/?q={{ filters.q }}&source={{ filters.source }}&role_type={{ filters.role_type }}&location={{ filters.location }}" class="chip">{{ 'New today' if filters.freshness == 'new_today' else 'Last 3 days' }} &times;</a>
                 {% endif %}
                 {% if filters.q %}
-                <a href="/?source={{ filters.source }}&role_type={{ filters.role_type }}&location={{ filters.location }}" class="chip">Search &times;</a>
+                <a href="/?source={{ filters.source }}&role_type={{ filters.role_type }}&location={{ filters.location }}&days={{ filters.freshness }}" class="chip">Search &times;</a>
                 {% endif %}
                 <a href="/" class="chip chip-clear">Clear all</a>
               </div>
@@ -82,9 +85,14 @@
               <select id="source" name="source">
                 <option value="" {% if not filters.source %}selected{% endif %}>Any</option>
                 <option value="rozee" {% if filters.source == 'rozee' %}selected{% endif %}>Rozee</option>
+                <option value="mustakbil" {% if filters.source == 'mustakbil' %}selected{% endif %}>Mustakbil</option>
                 <option value="remoteok" {% if filters.source == 'remoteok' %}selected{% endif %}>RemoteOK</option>
                 <option value="weworkremotely" {% if filters.source == 'weworkremotely' %}selected{% endif %}>We Work Remotely</option>
                 <option value="github_jobs" {% if filters.source == 'github_jobs' %}selected{% endif %}>GitHub Jobs</option>
+                <option value="wellfound" {% if filters.source == 'wellfound' %}selected{% endif %}>Wellfound</option>
+                <option value="glassdoor" {% if filters.source == 'glassdoor' %}selected{% endif %}>Glassdoor</option>
+                <option value="indeed" {% if filters.source == 'indeed' %}selected{% endif %}>Indeed</option>
+                <option value="linkedin_jobs" {% if filters.source == 'linkedin_jobs' %}selected{% endif %}>LinkedIn Jobs</option>
               </select>
             </div>
             <div class="filter-field">
@@ -101,6 +109,14 @@
                 <option value="" {% if not filters.location %}selected{% endif %}>Any</option>
                 <option value="lahore" {% if filters.location == 'lahore' %}selected{% endif %}>Lahore (local)</option>
                 <option value="remote" {% if filters.location == 'remote' %}selected{% endif %}>Remote</option>
+              </select>
+            </div>
+            <div class="filter-field">
+              <label class="filter-label" for="days">Freshness</label>
+              <select id="days" name="days">
+                <option value="" {% if not filters.freshness %}selected{% endif %}>Any</option>
+                <option value="new_today" {% if filters.freshness == 'new_today' %}selected{% endif %}>New today</option>
+                <option value="last_3_days" {% if filters.freshness == 'last_3_days' %}selected{% endif %}>Last 3 days</option>
               </select>
             </div>
             <div class="filter-actions">

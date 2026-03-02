@@ -19,5 +19,5 @@ class WWRSSScraper:
         limit: int = 50,
     ) -> list[JobIn]:
         fetch_limit = min(limit * 3, 200) if (query or location) else limit
-        jobs = scrape_weworkremotely(limit=fetch_limit)
+        jobs = scrape_weworkremotely(query=query, location=location, limit=fetch_limit)
         return filter_jobs(jobs, query=query, location=location, limit=limit)

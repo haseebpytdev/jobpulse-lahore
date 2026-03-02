@@ -1,15 +1,17 @@
 """
-Adapter: Rozee.pk → Scraper protocol.
+Adapter: LinkedIn Jobs — stub.
+
+Uncomment and register when scrape_linkedin_jobs is implemented (browser/API).
 """
 from __future__ import annotations
 
 from app.models import JobIn
 from app.scrapers.base import Scraper, filter_jobs
-from app.scrapers.rozee import scrape_rozee
+from app.scrapers.linkedin_jobs import scrape_linkedin_jobs
 
 
-class RozeeScraper:
-    name = "rozee"
+class LinkedInJobsScraper:
+    name = "linkedin_jobs"
 
     def fetch(
         self,
@@ -18,11 +20,5 @@ class RozeeScraper:
         location: str = "",
         limit: int = 50,
     ) -> list[JobIn]:
-        jobs = scrape_rozee(
-            query=query,
-            location=location,
-            limit=limit,
-            max_pages=3,
-            delay_sec=1.0,
-        )
+        jobs = scrape_linkedin_jobs(query=query, location=location, limit=limit)
         return filter_jobs(jobs, query=query, location=location, limit=limit)

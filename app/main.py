@@ -94,11 +94,15 @@ def dashboard(
 ):
     """Dashboard with filters, pagination, and refresh flash."""
     offset = (page - 1) * limit
+    freshness = days.strip().lower() if days else ""
+    if freshness not in ("new_today", "last_3_days"):
+        freshness = ""
     jobs = list_jobs(
         q=q, source=source, role_type=role_type, location=location,
+        freshness=freshness,
         limit=limit, offset=offset,
     )
-    total = count_jobs(q=q, source=source, role_type=role_type, location=location)
+    total = count_jobs(q=q, source=source, role_type=role_type, location=location, freshness=freshness)
     has_more = offset + len(jobs) < total
     total_pages = (total + limit - 1) // limit if limit else 1
 
@@ -109,7 +113,7 @@ def dashboard(
         "last_updated": datetime.now().strftime("%Y-%m-%d %H:%M"),
     }
 
-    filters = {"q": q, "source": source, "role_type": role_type, "location": location, "days": days}
+    filters = {"q": q, "source": source, "role_type": role_type, "location": location, "days": days, "freshness": freshness}
     flash = {
         "refreshed": refreshed,
         "fetched": fetched,
@@ -126,9 +130,9 @@ def dashboard(
         "rate_limited": rate_limited,
     }
 
-    export_params = {k: v for k, v in [("q", q), ("source", source), ("role_type", role_type), ("location", location)] if v}
+    export_params = {k: v for k, v in [("q", q), ("source", source), ("role_type", role_type), ("location", location), ("days", days)] if v}
     export_url = "/export.csv" + ("?" + urlencode(export_params) if export_params else "")
-    load_more_params = [(k, v) for k, v in [("page", page + 1), ("q", q), ("source", source), ("role_type", role_type), ("location", location)] if v]
+    load_more_params = [(k, v) for k, v in [("page", page + 1), ("q", q), ("source", source), ("role_type", role_type), ("location", location), ("days", days)] if v]
     load_more_url = "/?" + urlencode(load_more_params)
 
     return templates.TemplateResponse(
@@ -198,13 +202,18 @@ def export_csv(
     source: str = "",
     role_type: str = "",
     location: str = "",
+    days: str = "",
 ):
     """Export jobs matching current filters as CSV."""
     import csv
     import io
 
+    freshness = days.strip().lower() if days else ""
+    if freshness not in ("new_today", "last_3_days"):
+        freshness = ""
     jobs = list_jobs(
         q=q, source=source, role_type=role_type, location=location,
+        freshness=freshness,
         limit=10000, offset=0,
     )
     out = io.StringIO()

@@ -19,18 +19,21 @@ JOBS_JSON_URL = "https://raw.githubusercontent.com/remote-jobs-com/remote-jobs/m
 DEFAULT_HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; JobPulse/1.0)"}
 
 
-def scrape_github_jobs(limit: int = 30) -> List[Dict[str, Any]]:
+def scrape_github_jobs(
+    query: str = "",
+    location: str = "",
+    limit: int = 30,
+) -> List[Dict[str, Any]]:
     """
-    Fetch job listings from GitHub Jobs–style JSON (legacy API or repo).
-    Returns list of dicts matching jobs table schema; source="github_jobs".
+    Fetch job listings from GitHub Jobs–style JSON. Uses query/location in API if supported;
+    otherwise returns more and caller filters via filter_jobs.
     """
     out: List[Dict[str, Any]] = []
 
-    # Try legacy API first (description=python)
     try:
         resp = requests.get(
             LEGACY_API_URL,
-            params={"description": "python", "location": ""},
+            params={"description": query or "python", "location": location or ""},
             headers=DEFAULT_HEADERS,
             timeout=15,
         )
@@ -48,7 +51,7 @@ def scrape_github_jobs(limit: int = 30) -> List[Dict[str, Any]]:
             apply_url = (j.get("url") or j.get("link") or "").strip()
             if not title or not apply_url:
                 continue
-            location = (j.get("location") or "Remote").strip()
+            location_val = (j.get("location") or "Remote").strip()
             lt = title.lower()
             role_type = (
                 "intern"
@@ -63,7 +66,7 @@ def scrape_github_jobs(limit: int = 30) -> List[Dict[str, Any]]:
                 {
                     "title": title,
                     "company": company,
-                    "location": location,
+                    "location": location_val,
                     "source": "github_jobs",
                     "role_type": role_type,
                     "posted_date_text": str(j.get("date") or j.get("created_at") or "unknown"),
@@ -71,7 +74,7 @@ def scrape_github_jobs(limit: int = 30) -> List[Dict[str, Any]]:
                     "apply_url": apply_url,
                 }
             )
-            if len(out) >= limit:
+            if len(out) >= limit * 3:
                 return out
 
     return out

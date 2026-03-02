@@ -21,16 +21,19 @@ def _text(el: ET.Element | None) -> str:
     return (el.text or "").strip()
 
 
-def scrape_weworkremotely(limit: int = 50) -> List[Dict[str, Any]]:
+def scrape_weworkremotely(
+    query: str = "",
+    location: str = "",
+    limit: int = 50,
+) -> List[Dict[str, Any]]:
     """
     Fetch We Work Remotely programming jobs from RSS.
-    Returns list of dicts matching jobs table schema.
+    No server-side search; returns all and caller filters by query/location (e.g. filter_jobs).
     """
     resp = requests.get(RSS_URL, headers=DEFAULT_HEADERS, timeout=20)
     resp.raise_for_status()
 
     root = ET.fromstring(resp.text)
-    # RSS 2.0: rss > channel > item
     channel = root.find("channel")
     if channel is None:
         return []
@@ -47,7 +50,6 @@ def scrape_weworkremotely(limit: int = 50) -> List[Dict[str, Any]]:
         if not title or not apply_url:
             continue
 
-        # Optional: parse "Company - Title" or "Title at Company" from RSS title
         company = "Unknown"
         if " at " in title:
             parts = title.split(" at ", 1)
@@ -60,12 +62,6 @@ def scrape_weworkremotely(limit: int = 50) -> List[Dict[str, Any]]:
                 company = parts[0].strip()
                 title = parts[1].strip()
 
-        # Filter to Python when possible (title/description)
-        raw_desc = _text(desc_el) or ""
-        if "python" not in title.lower() and "python" not in raw_desc.lower():
-            continue
-
-        # Role type heuristic
         lt = title.lower()
         role_type = (
             "intern"
@@ -80,7 +76,7 @@ def scrape_weworkremotely(limit: int = 50) -> List[Dict[str, Any]]:
         out.append(
             {
                 "title": title,
-                "company": "Unknown",  # RSS often doesn't have company in a separate tag
+                "company": company,
                 "location": "Remote",
                 "source": "weworkremotely",
                 "role_type": role_type,
@@ -89,7 +85,7 @@ def scrape_weworkremotely(limit: int = 50) -> List[Dict[str, Any]]:
                 "apply_url": apply_url,
             }
         )
-        if len(out) >= limit:
+        if len(out) >= limit * 3:
             break
 
     return out

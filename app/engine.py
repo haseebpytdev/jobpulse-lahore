@@ -9,8 +9,8 @@ import logging
 import time
 from dataclasses import dataclass, field
 
-from app.db import upsert_jobs
-from app.scrapers.registry import SOURCE_DISPLAY_NAMES, SCRAPERS
+from app.db import init_db, upsert_jobs
+from app.scrapers import registry as reg
 
 logger = logging.getLogger(__name__)
 
@@ -62,13 +62,14 @@ def run_engine(
     Run selected scrapers, upsert results, capture per-source metrics.
     If sources is None or empty, run all registered scrapers.
     """
+    init_db()
     report = RunReport()
     if not sources:
-        sources = list(SCRAPERS.keys())
+        sources = list(reg.SCRAPERS.keys())
 
     for source_key in sources:
-        scraper = SCRAPERS.get(source_key)
-        display_name = SOURCE_DISPLAY_NAMES.get(source_key, source_key)
+        scraper = reg.SCRAPERS.get(source_key)
+        display_name = reg.SOURCE_DISPLAY_NAMES.get(source_key, source_key)
 
         if not scraper:
             report.results.append(

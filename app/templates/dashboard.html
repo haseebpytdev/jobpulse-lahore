@@ -4,243 +4,196 @@
   <meta charset="UTF-8" />
   <title>JobPulse Lahore</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link
-    rel="stylesheet"
-    href="{{ url_for('static', path='app.css') }}"
-  />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="{{ url_for('static', path='app.css') }}" />
 </head>
 <body>
-  <div class="shell">
-    <header>
-      <div class="brand">
-        <div class="logo-dot"></div>
-        <div class="brand-text">
-          <div class="brand-title">
-            JobPulse Lahore
-            <span class="brand-badge">MVP  ·  Local Talent Radar</span>
-          </div>
-          <div class="brand-subtitle">
-            Curating Python, Django & early-career roles around Lahore.
-          </div>
-        </div>
+  <div class="app-shell">
+    <header class="top-nav">
+      <div class="nav-left">
+        <a href="/" class="brand">
+          <span class="logo-icon"></span>
+          <span class="brand-name">JobPulse</span>
+        </a>
+        <nav class="nav-tabs">
+          <a href="/" class="nav-tab nav-tab-active">Job list</a>
+        </nav>
       </div>
-      <div class="meta">
-        <form method="post" action="/refresh" style="display:inline;">
-          <button type="submit" class="btn-refresh">Refresh jobs</button>
+      <div class="nav-right">
+        <form method="post" action="/refresh" class="nav-refresh-form">
+          <button type="submit" class="btn-cta">Refresh jobs</button>
         </form>
-        <div class="meta-pill">
-          <span style="width: 7px; height: 7px; border-radius: 999px; background:#22c55e; box-shadow:0 0 0 1px rgba(22,163,74,0.7);"></span>
-          <span>Backend-powered shortlist · server-filtered</span>
-        </div>
-        <span>Last updated: {{ stats.last_updated }}</span>
+        <span class="nav-meta">Last updated: {{ stats.last_updated }}</span>
       </div>
     </header>
 
     {% if flash.rate_limited %}
     <div class="alert alert-warning">
-      Please wait {{ 30 }} seconds between refreshes. Try again shortly.
+      Please wait 30 seconds between refreshes. Try again shortly.
     </div>
     {% endif %}
 
     {% if flash.refreshed %}
     <div class="alert alert-info">
-      Refresh complete — total fetched {{ flash.fetched }}, inserted {{ flash.inserted }} new.
-      {% if flash.refresh_status %}
-      <br /><span class="refresh-status">{{ flash.refresh_status }}</span>
-      {% endif %}
-      <br />
-      <strong>Rozee:</strong> fetched {{ flash.rozee_fetched }}, inserted {{ flash.rozee_inserted }}.
-      <strong>RemoteOK:</strong> fetched {{ flash.remoteok_fetched }}, inserted {{ flash.remoteok_inserted }}.
-      <strong>We Work Remotely:</strong> fetched {{ flash.weworkremotely_fetched }}, inserted {{ flash.weworkremotely_inserted }}.
-      <strong>GitHub Jobs:</strong> fetched {{ flash.github_jobs_fetched }}, inserted {{ flash.github_jobs_inserted }}.
+      Refresh complete — fetched {{ flash.fetched }}, inserted {{ flash.inserted }} new.
+      {% if flash.refresh_status %}<span class="refresh-status">{{ flash.refresh_status }}</span>{% endif %}
     </div>
     {% endif %}
 
-    <main>
-      <section class="jobs-panel">
-        <div class="panel-inner">
-          <div class="panel-header">
-            <div class="panel-title">Live snapshot</div>
-            <span class="badge-soft">
-              {{ stats.total_jobs }} roles · {{ stats.sources_count }} source{{ 's' if stats.sources_count != 1 else '' }} · newest first
-            </span>
+    <div class="app-body">
+      <aside class="sidebar">
+        <div class="sidebar-inner">
+          <h2 class="sidebar-title">Filter by</h2>
+
+          <form method="get" action="/" class="filter-form">
+            <div class="filter-field filter-search">
+              <label class="filter-label" for="q">Search</label>
+              <div class="search-input-wrap">
+                <span class="search-icon" aria-hidden="true">&#8981;</span>
+                <input id="q" type="text" name="q" placeholder="Python, Django, Company..." value="{{ filters.q }}" class="search-input" />
+              </div>
+            </div>
+
+            {% if filters.source or filters.role_type or filters.location or filters.q %}
+            <div class="active-filters">
+              <span class="filter-label">Active filters</span>
+              <div class="filter-chips">
+                {% if filters.source %}
+                <a href="/?q={{ filters.q }}&role_type={{ filters.role_type }}&location={{ filters.location }}" class="chip">{{ filters.source | replace('_', ' ') | title }} &times;</a>
+                {% endif %}
+                {% if filters.role_type %}
+                <a href="/?q={{ filters.q }}&source={{ filters.source }}&location={{ filters.location }}" class="chip">{{ filters.role_type | title }} &times;</a>
+                {% endif %}
+                {% if filters.location %}
+                <a href="/?q={{ filters.q }}&source={{ filters.source }}&role_type={{ filters.role_type }}" class="chip">{{ 'Lahore (local)' if filters.location == 'lahore' else 'Remote' }} &times;</a>
+                {% endif %}
+                {% if filters.q %}
+                <a href="/?source={{ filters.source }}&role_type={{ filters.role_type }}&location={{ filters.location }}" class="chip">Search &times;</a>
+                {% endif %}
+                <a href="/" class="chip chip-clear">Clear all</a>
+              </div>
+            </div>
+            {% endif %}
+
+            <div class="filter-field">
+              <label class="filter-label" for="source">Source</label>
+              <select id="source" name="source">
+                <option value="" {% if not filters.source %}selected{% endif %}>Any</option>
+                <option value="rozee" {% if filters.source == 'rozee' %}selected{% endif %}>Rozee</option>
+                <option value="remoteok" {% if filters.source == 'remoteok' %}selected{% endif %}>RemoteOK</option>
+                <option value="weworkremotely" {% if filters.source == 'weworkremotely' %}selected{% endif %}>We Work Remotely</option>
+                <option value="github_jobs" {% if filters.source == 'github_jobs' %}selected{% endif %}>GitHub Jobs</option>
+              </select>
+            </div>
+            <div class="filter-field">
+              <label class="filter-label" for="role_type">Role type</label>
+              <select id="role_type" name="role_type">
+                <option value="" {% if not filters.role_type %}selected{% endif %}>Any</option>
+                <option value="intern" {% if filters.role_type == 'intern' %}selected{% endif %}>Intern</option>
+                <option value="trainee" {% if filters.role_type == 'trainee' %}selected{% endif %}>Trainee</option>
+              </select>
+            </div>
+            <div class="filter-field">
+              <label class="filter-label" for="location">Location</label>
+              <select id="location" name="location">
+                <option value="" {% if not filters.location %}selected{% endif %}>Any</option>
+                <option value="lahore" {% if filters.location == 'lahore' %}selected{% endif %}>Lahore (local)</option>
+                <option value="remote" {% if filters.location == 'remote' %}selected{% endif %}>Remote</option>
+              </select>
+            </div>
+            <div class="filter-actions">
+              <button type="submit" class="btn-apply">Apply filters</button>
+              <a href="/" class="btn-reset">Reset</a>
+            </div>
+          </form>
+
+          {% if run_report and run_report.results %}
+          <div class="sources-status">
+            <h3 class="sources-status-title">Sources status</h3>
+            <ul class="sources-status-list">
+              {% for r in run_report.results %}
+              <li class="source-row source-{{ r.status }}">
+                <span class="source-icon">{% if r.status == 'ok' %}&#10003;{% elif r.status == 'disabled' %}&#8856;{% else %}&#10007;{% endif %}</span>
+                <span class="source-name">{{ r.display_name }}</span>
+                {% if r.status == 'ok' %}
+                <span class="source-detail">{{ r.fetched }} fetched, {{ r.inserted }} inserted &middot; {{ r.duration_ms }}ms</span>
+                {% elif r.status == 'error' %}
+                <span class="source-detail source-err">{{ r.error_message[:50] }}{% if r.error_message|length > 50 %}…{% endif %}</span>
+                {% else %}
+                <span class="source-detail">{{ r.error_message or 'disabled' }}</span>
+                {% endif %}
+              </li>
+              {% endfor %}
+            </ul>
+          </div>
+          {% endif %}
+
+          <div class="sidebar-export">
+            <a href="{{ export_url }}" class="btn-export" download>Download CSV</a>
+          </div>
+        </div>
+      </aside>
+
+      <main class="main-content">
+        <div class="job-list-card">
+          <div class="job-list-header">
+            <h1 class="job-list-title">Job list</h1>
+            <span class="job-list-meta">{{ stats.total_jobs }} roles &middot; {{ stats.sources_count }} source{{ 's' if stats.sources_count != 1 else '' }}</span>
           </div>
 
-          <div class="stats-row">
-            <div class="stat-pill stat-highlight">
-              <span class="stat-label">Total roles</span>
-              <span class="stat-value">{{ stats.total_jobs }}</span>
-            </div>
-            <div class="stat-pill">
-              <span class="stat-label">New today</span>
-              <span class="stat-value">{{ stats.new_today }}</span>
-            </div>
-            <div class="stat-pill">
-              <span class="stat-label">Sources</span>
-              <span class="stat-value">{{ stats.sources_count }}</span>
-            </div>
+          <div class="job-list-stats">
+            <span class="stat-item stat-total">{{ stats.total_jobs }} total</span>
+            <span class="stat-item">{{ stats.new_today }} new today</span>
           </div>
 
           {% if jobs %}
-          <div class="jobs-list">
+          <div class="job-table">
             {% for job in jobs %}
-            <article class="job-card{% if job.is_new %} job-card-new{% endif %}">
-              <div class="job-main">
-                <div class="job-title-row">
-                  <h2 class="job-title">{{ job.title }}</h2>
-                  {% if job.is_new %}
-                  <span class="pill pill-new badge-new">New</span>
-                  {% endif %}
-                  <span class="pill pill-pill-blue">
-                    <span class="pill-dot"></span>
-                    {{ job.location }}
-                  </span>
+            <div class="job-row{% if job.is_new %} job-row-new{% endif %}">
+              <div class="job-row-main">
+                <div class="job-row-title-row">
+                  <h2 class="job-row-title">{{ job.title }}</h2>
+                  {% if job.is_new %}<span class="badge-new">New</span>{% endif %}
                 </div>
-                <div class="job-company">{{ job.company }}</div>
-                <div class="job-tags">
-                  <span class="pill">
-                    <span style="width:6px;height:6px;border-radius:999px;background:#38bdf8;"></span>
-                    Source · {{ job.source|capitalize }}
-                  </span>
-                  <span class="pill pill-pill-amber">
-                    <span style="width:6px;height:6px;border-radius:999px;background:#fbbf24;"></span>
-                    Role type · {{ job.role_type|capitalize }}
-                  </span>
+                <div class="job-row-meta">{{ job.company }} &middot; {{ job.location }}</div>
+                <div class="job-row-badges">
+                  <span class="badge badge-source">{{ job.source | replace('_', ' ') | title }}</span>
+                  <span class="badge badge-role">{{ job.role_type | title }}</span>
+                  <span class="badge badge-date">Posted {{ job.posted_date }}</span>
                 </div>
               </div>
-              <div class="job-meta">
-                <span class="posted-pill">
-                  Posted · {{ job.posted_date }}
-                </span>
-                <a
-                  href="{{ job.apply_url }}"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  class="apply-link"
-                >
-                  <span>Open original listing</span>
-                  <span>↗</span>
-                </a>
+              <div class="job-row-action">
+                <a href="{{ job.apply_url }}" target="_blank" rel="noopener noreferrer" class="link-view">View details &#8599;</a>
               </div>
-            </article>
+            </div>
             {% endfor %}
           </div>
-          {% if has_more %}
-          <p class="load-more-row">
-            <a href="{{ load_more_url }}" class="btn-secondary" style="text-decoration:none;">Load more</a>
+
+          {% if has_more or total_pages > 1 %}
+          <div class="job-list-footer">
+            {% if has_more %}
+            <a href="{{ load_more_url }}" class="btn-load-more">Load more</a>
+            {% endif %}
             <span class="page-info">Page {{ page }} of {{ total_pages }} ({{ total }} total)</span>
-          </p>
-          {% elif total_pages > 1 %}
-          <p class="load-more-row">
-            <span class="page-info">Page {{ page }} of {{ total_pages }} ({{ total }} total)</span>
-          </p>
+          </div>
           {% endif %}
           {% else %}
           <div class="empty-state">
-            <div class="empty-title">No roles match the current filters.</div>
-            <div class="empty-text">
-              Try clearing the search, switching sources, or broadening the role type to see more opportunities.
-            </div>
-            <div class="empty-hint">
-              <span class="chip">Hint: leave search blank to see all roles</span>
-              <span class="chip">Intern, trainee & junior tracks supported</span>
-            </div>
+            <p class="empty-title">No roles match the current filters.</p>
+            <p class="empty-text">Try clearing filters or broadening your search.</p>
+            <a href="/" class="btn-reset">Clear filters</a>
           </div>
           {% endif %}
         </div>
-      </section>
+      </main>
+    </div>
 
-      <aside class="filters-panel">
-        <div class="panel-inner">
-          <div class="panel-header">
-            <div class="panel-title">Filters</div>
-            <span class="badge-soft">Server-side · query params</span>
-          </div>
-
-          <form method="get" action="/">
-            <div class="filters-grid">
-              <div class="field">
-                <label class="field-label" for="q">Search</label>
-                <input
-                  id="q"
-                  type="text"
-                  name="q"
-                  placeholder="Python, Django, Intern, Company..."
-                  value="{{ filters.q }}"
-                />
-              </div>
-
-              <div class="field">
-                <label class="field-label" for="source">Source</label>
-                <select id="source" name="source">
-                  <option value="" {% if not filters.source %}selected{% endif %}>Any</option>
-                  <option value="indeed" {% if filters.source == 'indeed' %}selected{% endif %}>
-                    Indeed
-                  </option>
-                  <option value="rozee" {% if filters.source == 'rozee' %}selected{% endif %}>
-                    Rozee
-                  </option>
-                  <option value="remoteok" {% if filters.source == 'remoteok' %}selected{% endif %}>
-                    RemoteOK
-                  </option>
-                  <option value="weworkremotely" {% if filters.source == 'weworkremotely' %}selected{% endif %}>
-                    We Work Remotely
-                  </option>
-                  <option value="github_jobs" {% if filters.source == 'github_jobs' %}selected{% endif %}>
-                    GitHub Jobs
-                  </option>
-                </select>
-              </div>
-
-              <div class="field">
-                <label class="field-label" for="role_type">Role type</label>
-                <select id="role_type" name="role_type">
-                  <option value="" {% if not filters.role_type %}selected{% endif %}>Any</option>
-                  <option value="intern" {% if filters.role_type == 'intern' %}selected{% endif %}>
-                    Intern
-                  </option>
-                  <option value="trainee" {% if filters.role_type == 'trainee' %}selected{% endif %}>
-                    Trainee
-                  </option>
-                </select>
-              </div>
-
-              <div class="field">
-                <label class="field-label" for="location">Location</label>
-                <select id="location" name="location">
-                  <option value="" {% if not filters.location %}selected{% endif %}>Any</option>
-                  <option value="lahore" {% if filters.location == 'lahore' %}selected{% endif %}>
-                    Lahore (local)
-                  </option>
-                  <option value="remote" {% if filters.location == 'remote' %}selected{% endif %}>
-                    Remote
-                  </option>
-                </select>
-              </div>
-            </div>
-
-            <div class="actions-row">
-              <a href="{{ export_url }}" class="btn-export" download>Download CSV</a>
-              <a href="/" class="btn-secondary" style="text-decoration:none;">
-                Reset
-              </a>
-              <button type="submit" class="btn-primary">
-                Apply filters
-              </button>
-            </div>
-          </form>
-        </div>
-      </aside>
-    </main>
-
-    <footer>
-      <span>FastAPI · Jinja2 · Uvicorn · MVP-only in-memory dataset.</span>
-      <span class="footer-pill">
-        <span style="width:7px;height:7px;border-radius:999px;background:#22c55e;"></span>
-        <span>Backend-first filtering · no SPA required</span>
-      </span>
+    <footer class="app-footer">
+      <span>JobPulse Lahore &middot; FastAPI &middot; Multi-source scraper</span>
+      <span class="footer-dot">&#9679;</span>
     </footer>
   </div>
 </body>
 </html>
-

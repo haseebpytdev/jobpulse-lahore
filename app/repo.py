@@ -22,9 +22,10 @@ def list_jobs(
     sql_parts = [
         "SELECT title, company, location, source, role_type,",
         "       posted_date_text AS posted_date, apply_url, scraped_at,",
-        "       CASE WHEN datetime(substr(replace(COALESCE(scraped_at,''), 'T', ' '), 1, 19)) >= datetime('now', '-1 day') THEN 1 ELSE 0 END AS is_new",
+        "       first_seen_at, last_seen_at,",
+        "       CASE WHEN datetime(COALESCE(first_seen_at, scraped_at)) >= datetime('now', '-1 day') THEN 1 ELSE 0 END AS is_new",
         "FROM jobs",
-        "WHERE 1=1",
+        "WHERE is_active = 1",
     ]
     params: List[object] = []
 
@@ -69,7 +70,7 @@ def count_jobs(
     location: str = "",
 ) -> int:
     """Return total number of jobs matching the same filters as list_jobs (for pagination)."""
-    sql_parts = ["SELECT COUNT(*) FROM jobs", "WHERE 1=1"]
+    sql_parts = ["SELECT COUNT(*) FROM jobs", "WHERE is_active = 1"]
     params: List[object] = []
 
     if q:

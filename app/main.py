@@ -9,12 +9,10 @@ from fastapi.responses import HTMLResponse, RedirectResponse, Response, Streamin
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from .db import init_db, insert_jobs
+from .db import init_db, upsert_jobs
+from .engine import run_engine, RunReport, SourceResult
 from .repo import count_jobs, list_jobs
-from .scrapers.github_jobs import scrape_github_jobs
-from .scrapers.remoteok import scrape_remoteok_python
-from .scrapers.rozee import scrape_rozee_python_lahore
-from .scrapers.weworkremotely import scrape_weworkremotely
+from .scrapers.registry import SOURCE_DISPLAY_NAMES
 
 # --- Structured logging ---
 logging.basicConfig(
@@ -29,6 +27,7 @@ app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 REFRESH_COOLDOWN_SEC = 30
 _last_refresh_at: float | None = None
+_last_run_report: RunReport | None = None
 
 @app.get("/favicon.ico", include_in_schema=False)
 def favicon() -> Response:
@@ -69,31 +68,6 @@ def bootstrap_db() -> None:
         init_db()
 
 
-def _run_source(
-    name: str,
-    fetch_fn,
-    insert_fn,
-) -> tuple[int, int, str]:
-    """Run one scraper; return (fetched, inserted, status_string)."""
-    start = time.perf_counter()
-    try:
-        jobs = fetch_fn()
-        inserted = insert_fn(jobs)
-        duration_ms = int((time.perf_counter() - start) * 1000)
-        logger.info(
-            "refresh source=%s fetched=%s inserted=%s duration_ms=%s",
-            name, len(jobs), inserted, duration_ms,
-        )
-        return len(jobs), inserted, "ok"
-    except Exception as e:  # noqa: BLE001
-        duration_ms = int((time.perf_counter() - start) * 1000)
-        logger.warning(
-            "refresh source=%s error=%s duration_ms=%s",
-            name, str(e), duration_ms,
-        )
-        return 0, 0, str(e)[:80].replace(" ", "_")
-
-
 @app.get("/", response_class=HTMLResponse)
 def dashboard(
     request: Request,
@@ -130,7 +104,7 @@ def dashboard(
 
     stats = {
         "total_jobs": total,
-        "new_today": sum(1 for j in jobs if (j.get("posted_date") or "").lower() == "today"),
+        "new_today": sum(1 for j in jobs if j.get("is_new")),
         "sources_count": len(set(j["source"] for j in jobs)),
         "last_updated": datetime.now().strftime("%Y-%m-%d %H:%M"),
     }
@@ -172,18 +146,24 @@ def dashboard(
             "has_more": has_more,
             "export_url": export_url,
             "load_more_url": load_more_url,
+            "run_report": _last_run_report,
         },
     )
 
 
 @app.post("/refresh")
 @app.get("/refresh")
-def refresh() -> RedirectResponse:
+def refresh(
+    sources: str = "",
+    limit: int = 50,
+    query: str = "",
+    location: str = "",
+) -> RedirectResponse:
     """
-    Run all scrapers with per-source try/except; rate limit 30s.
-    Redirect with partial-success status (e.g. RemoteOK ok, Rozee blocked).
+    Run scrapers via the engine. Params: sources=remoteok,weworkremotely (comma-separated),
+    limit=50, query=python, location=remote. Rate limit 30s.
     """
-    global _last_refresh_at
+    global _last_refresh_at, _last_run_report
     now = time.perf_counter()
     if _last_refresh_at is not None and (now - _last_refresh_at) < REFRESH_COOLDOWN_SEC:
         logger.warning("refresh rate_limited cooldown_sec=%s", REFRESH_COOLDOWN_SEC)
@@ -192,38 +172,23 @@ def refresh() -> RedirectResponse:
             status_code=303,
         )
 
-    status_parts: list[str] = []
-    total_fetched = 0
-    total_inserted = 0
-    results = {}
-
-    def run(name: str, fetch_fn, insert_fn):
-        nonlocal total_fetched, total_inserted
-        f, i, st = _run_source(name, fetch_fn, insert_fn)
-        total_fetched += f
-        total_inserted += i
-        results[name] = (f, i, st)
-        if st == "ok":
-            status_parts.append(f"{name} ok")
-        else:
-            status_parts.append(f"{name} {st}")
-
-    run("Rozee", lambda: scrape_rozee_python_lahore(max_pages=1, delay_sec=1.0), insert_jobs)
-    run("RemoteOK", lambda: scrape_remoteok_python(limit=30), insert_jobs)
-    run("WWR", lambda: scrape_weworkremotely(limit=50), insert_jobs)
-    run("GitHubJobs", lambda: scrape_github_jobs(limit=30), insert_jobs)
-
+    source_list = [s.strip() for s in sources.split(",") if s.strip()]
+    report = run_engine(
+        sources=source_list if source_list else None,
+        query=query.strip(),
+        location=location.strip(),
+        limit=min(limit, 200),
+    )
+    _last_run_report = report
     _last_refresh_at = time.perf_counter()
-    refresh_status = ", ".join(status_parts)
 
     params = (
-        f"?refreshed=1&fetched={total_fetched}&inserted={total_inserted}"
-        f"&rozee_fetched={results['Rozee'][0]}&rozee_inserted={results['Rozee'][1]}"
-        f"&remoteok_fetched={results['RemoteOK'][0]}&remoteok_inserted={results['RemoteOK'][1]}"
-        f"&weworkremotely_fetched={results['WWR'][0]}&weworkremotely_inserted={results['WWR'][1]}"
-        f"&github_jobs_fetched={results['GitHubJobs'][0]}&github_jobs_inserted={results['GitHubJobs'][1]}"
-        f"&refresh_status={quote(refresh_status, safe='')}"
+        f"?refreshed=1&fetched={report.total_fetched}&inserted={report.total_inserted}"
+        f"&refresh_status={quote(report.status_summary, safe='')}"
     )
+    for r in report.results:
+        key = r.source_key
+        params += f"&{key}_fetched={r.fetched}&{key}_inserted={r.inserted}"
     return RedirectResponse(url="/" + params, status_code=303)
 
 

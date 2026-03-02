@@ -70,6 +70,17 @@ All main dependencies are tracked in `requirements.txt`.
 
    - `http://127.0.0.1:8000/`
 
+### Running tests
+
+Install pytest, then run:
+
+```bash
+pip install pytest
+pytest tests -v
+```
+
+Tests cover: `filter_jobs` (query/location), `upsert_jobs` (inserted vs updated), `run_engine` (mocked scrapers), and main routes (dashboard, refresh redirect, export CSV). See `VERIFICATION.md` for a manual checklist.
+
 ### Using the filters
 
 - **Search (`q`)**

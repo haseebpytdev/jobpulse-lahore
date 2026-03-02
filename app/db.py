@@ -1,20 +1,39 @@
 import sqlite3
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Mapping, Optional
+from typing import Any, Dict, Iterator, List, Mapping, Optional
 
 DB_PATH = Path("data") / "jobs.db"
 
 
 def get_conn() -> sqlite3.Connection:
-  """
-  Return a SQLite connection with Row factory enabled.
-  Keeps DB under data/jobs.db and ensures the folder exists.
-  """
-  DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-  conn = sqlite3.connect(DB_PATH)
-  conn.row_factory = sqlite3.Row
-  return conn
+    """
+    Return a SQLite connection.
+
+    - Uses uri=True so file:... URIs (e.g. shared in-memory DBs) work correctly.
+    - Uses check_same_thread=False so the same connection can be shared across threads if needed.
+    """
+    db_str = str(DB_PATH)
+    # Ensure on-disk DB directory exists; for URI-style DBs (file:...) this is a no-op.
+    if not db_str.startswith("file:"):
+        Path(db_str).parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(db_str, uri=True, check_same_thread=False)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+@contextmanager
+def db_conn() -> Iterator[sqlite3.Connection]:
+    """
+    Context manager that opens a SQLite connection via get_conn() and closes it on exit.
+    """
+    conn = get_conn()
+    try:
+        yield conn
+        conn.commit()
+    finally:
+        conn.close()
 
 
 def _migrate_add_seen_columns(cur: sqlite3.Cursor) -> None:
@@ -36,7 +55,7 @@ def init_db(sample_jobs: Optional[List[Mapping[str, Any]]] = None) -> None:
   - UNIQUE(apply_url) for dedupe; first_seen_at / last_seen_at for freshness.
   - Migration adds first_seen_at, last_seen_at, is_active to existing DBs.
   """
-  with get_conn() as conn:
+  with db_conn() as conn:
     cur = conn.cursor()
 
     cur.execute(
@@ -153,7 +172,7 @@ def insert_jobs(jobs: List[Mapping[str, Any]]) -> int:
       }
     )
   inserted = 0
-  with get_conn() as conn:
+  with db_conn() as conn:
     cur = conn.cursor()
     for row in payload:
       cur.execute(
@@ -189,7 +208,7 @@ def upsert_jobs(jobs: List[Mapping[str, Any]]) -> tuple[int, int]:
   now = datetime.now(timezone.utc).isoformat(timespec="seconds")
   inserted_total = 0
   updated_total = 0
-  with get_conn() as conn:
+  with db_conn() as conn:
     cur = conn.cursor()
     for job in jobs:
       row = {

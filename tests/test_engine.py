@@ -22,13 +22,14 @@ def test_run_engine_unknown_source_returns_disabled(temp_db):
 
 
 def test_run_engine_with_mock_scraper(monkeypatch, temp_db):
-    """Patch engine's SCRAPERS so run_engine uses our mock (engine imports at load time)."""
-    import app.engine as engine_module
+    """Patch the registry so run_engine uses our mock (source of truth is app.scrapers.registry)."""
+    from app.scrapers import registry as reg
+
     jobs = [
         {"title": "T", "company": "C", "location": "L", "source": "mock", "role_type": "r", "posted_date_text": "d", "apply_url": "https://x.com/1"},
     ]
-    monkeypatch.setattr(engine_module, "SCRAPERS", {"mock": MockScraper("mock", jobs)})
-    monkeypatch.setattr(engine_module, "SOURCE_DISPLAY_NAMES", {"mock": "Mock"})
+    monkeypatch.setattr(reg, "SCRAPERS", {"mock": MockScraper("mock", jobs)})
+    monkeypatch.setattr(reg, "SOURCE_DISPLAY_NAMES", {"mock": "Mock"})
     report = run_engine(sources=["mock"], limit=50)
     assert report.total_fetched == 1
     assert report.total_inserted == 1
